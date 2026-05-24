@@ -1,0 +1,58 @@
+name: Deploy to Hostinger VPS
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  deploy:
+    name: Landing Page
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. GitHub Runner gets the code from your repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Compress the project files (excluding the .git folder to save space)
+      - name: Create Archive
+        run: |
+          # Build the archive in the system's temp folder so it doesn't conflict with the read process
+          tar -czf /tmp/project-build.tar.gz --exclude='.git' .
+
+          # Move it back into the project folder so the SCP step can easily find it
+          mv /tmp/project-build.tar.gz ./project-build.tar.gz
+
+      # 3. Send the compressed file to your VPS securely over SSH (SCP)
+      - name: Copy Archive to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "project-build.tar.gz"
+          target: "/tmp" # Upload to the temporary folder first
+
+      # 4. Connect to VPS, extract the files, and run your Docker deploy script
+      - name: Execute Deployment Scripts
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            PROJECT_DIR="/var/www/landpage"
+
+            # Ensure the project directory exists
+            mkdir -p $PROJECT_DIR
+
+            # Extract the code directly into the project folder, overwriting old files
+            tar -xzf /tmp/project-build.tar.gz -C $PROJECT_DIR
+
+            # Clean up the archive file from the VPS
+            rm /tmp/project-build.tar.gz
+
+            # Navigate to the folder and run the scripts
+            cd $PROJECT_DIR
+            bash ./deploy.sh
