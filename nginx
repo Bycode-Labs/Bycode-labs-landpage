@@ -1,0 +1,11 @@
+server {
+    listen 80;
+    server_name bycodelabs.matrix-labs.tech;
+
+    root /var/www/landpage/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri.html $uri/ =404;
+    }
+}
